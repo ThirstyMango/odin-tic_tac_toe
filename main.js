@@ -18,6 +18,10 @@ const gameboard = (function () {
     board[x][y] = mark;
   }
 
+  function clearBoard() {
+    board = Array.from(Array(3), () => new Array(3));
+  }
+
   // Starting on x, y, determine, whether there are three same marks in the direction
   function isDirectionWin(x, y, direction, mark, markCount = 0) {
     if (board[x][y] !== mark) return false;
@@ -30,6 +34,10 @@ const gameboard = (function () {
       mark,
       markCount
     );
+  }
+
+  function isTie() {
+    return !board.some((row) => row.includes(undefined));
   }
 
   function isWinner(x, y, mark) {
@@ -52,46 +60,62 @@ const gameboard = (function () {
     return isWinner;
   }
 
-  return { getBoard, placeMark, isWinner };
+  return { getBoard, placeMark, isWinner, isTie, clearBoard };
 })();
 
-function createGame(players) {
-  let round = 0;
+const game = (function () {
+  let winner = null;
+  const players = [];
   let cPlayerIndex = 0;
-  let cPlayer = players[0];
+  let round = 0;
 
-  function nextPlayer() {
+  function assignPlayer(player) {
+    players.push(player);
+  }
+
+  function _nextPlayerIndex() {
     cPlayerIndex = (cPlayerIndex + 1) % players.length;
-    cPlayer = players[cPlayerIndex];
   }
 
   function playRound(x, y) {
+    if (players.length < 2) {
+      throw new Error("Atleast two players must be present");
+    }
+
     round++;
+    const cPlayer = players[cPlayerIndex];
     gameboard.placeMark(x, y, cPlayer.mark);
-    console.log(`Round ${round}, ${cPlayer.name}'s turn with ${cPlayer.mark}`);
-    console.log(gameboard.getBoard());
 
     if (gameboard.isWinner(x, y, cPlayer.mark)) {
-      console.log(`${cPlayer.name} has won.`);
+      winner = cPlayer;
+      return;
+    } else if (gameboard.isTie()) {
       return;
     }
 
-    nextPlayer();
+    _nextPlayerIndex();
   }
 
-  return { playRound };
-}
+  function restart() {
+    winner = null;
+    gameboard.clearBoard();
+    cPlayerIndex = 0;
+    round = 0;
+  }
+
+  return { assignPlayer, playRound, restart };
+})();
 
 function createPlayer(name, mark) {
   return { name, mark };
 }
 
-// const jeff = createPlayer("Jeff", "X");
-// const george = createPlayer("George", "O");
+const ui = (function () {
+  // const board;
 
-// const game = createGame([jeff, george]);
-// game.playRound(0, 0);
-// game.playRound(1, 0);
-// game.playRound(1, 1);
-// game.playRound(2, 0);
-// game.playRound(2, 2);
+  function cacheDOM() {
+    board = board || document.querySelector("#board");
+  }
+
+  function render() {}
+})();
