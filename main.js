@@ -1,5 +1,5 @@
 const gameboard = (function () {
-  let board = Array.from(Array(3), () => new Array(3));
+  let board = Array.from(Array(3), () => new Array(3).fill(undefined));
 
   // $ possible directions to win in
   const boardDirections = {
@@ -19,7 +19,7 @@ const gameboard = (function () {
   }
 
   function clearBoard() {
-    board = Array.from(Array(3), () => new Array(3));
+    board = Array.from(Array(3), () => new Array(3).fill(undefined));
   }
 
   // Starting on x, y, determine, whether there are three same marks in the direction
@@ -66,7 +66,7 @@ const gameboard = (function () {
 const game = (function () {
   const maxPlayers = 2;
   let winner;
-  const players = [];
+  let players = [];
   let cPlayerIndex = 0;
   let round = 0;
 
@@ -108,6 +108,7 @@ const game = (function () {
   }
 
   function restart() {
+    players = [];
     winner = undefined;
     gameboard.clearBoard();
     cPlayerIndex = 0;
@@ -165,7 +166,7 @@ const ui = (function () {
   }
 
   function handleBoardClick(e) {
-    if (!e.target.dataset.type === "tile") return;
+    if (e.target.dataset.type !== "tile") return;
 
     if (game.getPlayers().length < game.maxPlayers) {
       _renderMessage("Player/s missing");
@@ -197,29 +198,47 @@ const ui = (function () {
   function handleRestartClick() {
     game.restart();
     _renderBoard();
+    _deletePlayers();
+    _toggleBtn(btnStart);
     _toggleBtn(btnRestart);
     _hideMessage();
   }
 
   function handleStartClick() {
+    _renderBoard();
     _toggleForm();
     _toggleBtn(btnStart);
   }
 
+  // DOM creators
+  function createTile(x, y, mark) {
+    const tile = document.createElement("div");
+    tile.textContent = mark;
+    tile.classList.add("board__tile");
+    tile.dataset.type = "tile";
+    tile.dataset.x = `${x}`;
+    tile.dataset.y = `${y}`;
+    return tile;
+  }
+
   // Renders
   function _renderBoard() {
-    const board = gameboard.getBoard();
-    let cIndex = 0;
-    for (let i = 0; i < board.length; i++) {
-      for (let j = 0; j < board[0].length; j++) {
-        let cMark = "";
-        if (board[i][j]) {
-          cMark = board[i][j];
-        }
-        boardTiles[cIndex].textContent = cMark;
-        cIndex++;
-      }
-    }
+    board.textContent = "";
+    const boardScheme = gameboard.getBoard();
+    // For each board cell, we create a tile from it and append it to the board
+    boardScheme.forEach((row, rowIndex) =>
+      row.forEach((col, colIndex) =>
+        board.appendChild(
+          createTile(
+            rowIndex,
+            colIndex,
+            boardScheme[rowIndex][colIndex]
+              ? boardScheme[rowIndex][colIndex]
+              : ""
+          )
+        )
+      )
+    );
   }
 
   function _renderPlayer() {
@@ -234,6 +253,10 @@ const ui = (function () {
     const state = alert ? "alert" : "success";
     errorMessage.classList.add(state);
     errorMessage.classList.remove("hidden");
+  }
+
+  function _deletePlayers() {
+    players.textContent = "";
   }
 
   function _hideMessage() {

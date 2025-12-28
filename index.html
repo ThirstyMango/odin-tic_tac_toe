@@ -18,6 +18,7 @@
         method="post"
         class="player__form hidden"
         id="player-form"
+        autocomplete="off"
       >
         <label for="player-name"><i>Add player:</i></label>
         <input
@@ -29,17 +30,7 @@
         />
         <button class="btn" type="submit">Save</button>
       </form>
-      <div class="board" data-type="board">
-        <div class="board__tile" data-type="tile" data-x="0" data-y="0"></div>
-        <div class="board__tile" data-type="tile" data-x="0" data-y="1"></div>
-        <div class="board__tile" data-type="tile" data-x="0" data-y="2"></div>
-        <div class="board__tile" data-type="tile" data-x="1" data-y="0"></div>
-        <div class="board__tile" data-type="tile" data-x="1" data-y="1"></div>
-        <div class="board__tile" data-type="tile" data-x="1" data-y="2"></div>
-        <div class="board__tile" data-type="tile" data-x="2" data-y="0"></div>
-        <div class="board__tile" data-type="tile" data-x="2" data-y="1"></div>
-        <div class="board__tile" data-type="tile" data-x="2" data-y="2"></div>
-      </div>
+      <div class="board" data-type="board"></div>
       <button class="btn btn--restart hidden" type="button">Restart</button>
       <p class="message hidden" id="error-message"></p>
     </main>
