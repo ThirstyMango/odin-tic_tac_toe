@@ -4,53 +4,44 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TicTacToe</title>
-    <script src="./main.js"></script>
+    <script defer src="./main.js"></script>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
     <main class="app">
       <h1>The Odin Project</h1>
       <h3>Tic Tac Toe</h3>
-      <div class="players">
-        <div class="player" data-id="1">
-          <form action="#" class="player__form">
-            <label for="player-name-1"><i>Player 1:</i></label>
-            <input
-              type="text"
-              name="player-name-1"
-              id="player-name-1"
-              required
-            />
-            <button class="btn" type="submit">Save</button>
-          </form>
-          <output class="hidden">Player 1: George, mark: X </output>
-        </div>
-        <div class="player" data-id="2">
-          <form action="#" class="player__form">
-            <label for="player-name-2"><i>Player 2:</i></label>
-            <input
-              type="text"
-              name="player-name-2"
-              id="player-name-2"
-              required
-            />
-            <button class="btn" type="submit">Save</button>
-          </form>
-          <output class="hidden">Player 2: Chamberlain, mark: O </output>
-        </div>
-      </div>
-      <div class="board">
-        <div class="board__tile" data-x="0" data-y="0">X</div>
-        <div class="board__tile" data-x="0" data-y="1">O</div>
-        <div class="board__tile" data-x="0" data-y="2">X</div>
-        <div class="board__tile" data-x="1" data-y="0">X</div>
-        <div class="board__tile" data-x="1" data-y="1">O</div>
-        <div class="board__tile" data-x="1" data-y="2">O</div>
-        <div class="board__tile" data-x="2" data-y="0">O</div>
-        <div class="board__tile" data-x="2" data-y="1">X</div>
-        <div class="board__tile" data-x="2" data-y="2">X</div>
+      <div class="players"></div>
+      <button class="btn btn--start" type="button">Play</button>
+      <form
+        action="#"
+        method="post"
+        class="player__form hidden"
+        id="player-form"
+      >
+        <label for="player-name"><i>Add player:</i></label>
+        <input
+          type="text"
+          name="player-name"
+          placeholder="Name"
+          id="player-name"
+          required
+        />
+        <button class="btn" type="submit">Save</button>
+      </form>
+      <div class="board" data-type="board">
+        <div class="board__tile" data-type="tile" data-x="0" data-y="0"></div>
+        <div class="board__tile" data-type="tile" data-x="0" data-y="1"></div>
+        <div class="board__tile" data-type="tile" data-x="0" data-y="2"></div>
+        <div class="board__tile" data-type="tile" data-x="1" data-y="0"></div>
+        <div class="board__tile" data-type="tile" data-x="1" data-y="1"></div>
+        <div class="board__tile" data-type="tile" data-x="1" data-y="2"></div>
+        <div class="board__tile" data-type="tile" data-x="2" data-y="0"></div>
+        <div class="board__tile" data-type="tile" data-x="2" data-y="1"></div>
+        <div class="board__tile" data-type="tile" data-x="2" data-y="2"></div>
       </div>
       <button class="btn btn--restart hidden" type="button">Restart</button>
+      <p class="message hidden" id="error-message"></p>
     </main>
   </body>
 </html>

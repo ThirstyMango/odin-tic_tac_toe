@@ -4,7 +4,7 @@ const gameboard = (function () {
   // $ possible directions to win in
   const boardDirections = {
     leftDiagonal: { x: 1, y: 1 },
-    rightDiagonal: { x: -1, y: -1 },
+    rightDiagonal: { x: 1, y: -1 },
     horizontal: { x: 1, y: 0 },
     vertical: { x: 0, y: 1 },
   };
@@ -42,7 +42,7 @@ const gameboard = (function () {
 
   function isWinner(x, y, mark) {
     const onLeftDiagonal = x === y;
-    const onRightDiagonal = 3 - x === y;
+    const onRightDiagonal = x === 2 - y;
 
     let isWinner =
       isDirectionWin(0, y, boardDirections.horizontal, mark, 0) ||
@@ -55,7 +55,7 @@ const gameboard = (function () {
     if (onRightDiagonal)
       isWinner =
         isWinner ||
-        isDirectionWin(2, 0, boardDirections.rightDiagonal, mark, 0);
+        isDirectionWin(0, 2, boardDirections.rightDiagonal, mark, 0);
 
     return isWinner;
   }
@@ -64,12 +64,20 @@ const gameboard = (function () {
 })();
 
 const game = (function () {
-  let winner = null;
+  const maxPlayers = 2;
+  let winner;
   const players = [];
   let cPlayerIndex = 0;
   let round = 0;
 
-  function assignPlayer(player) {
+  const getPlayers = () => players;
+
+  const getWinner = () => winner;
+
+  function assignPlayer(playerName) {
+    const playerMark = players.length === 0 ? "X" : "O";
+    const player = createPlayer(playerName, playerMark, players.length + 1);
+
     players.push(player);
   }
 
@@ -82,40 +90,162 @@ const game = (function () {
       throw new Error("Atleast two players must be present");
     }
 
+    if (winner) {
+      throw new Error("Game has already ended");
+    }
+
     round++;
     const cPlayer = players[cPlayerIndex];
     gameboard.placeMark(x, y, cPlayer.mark);
 
     if (gameboard.isWinner(x, y, cPlayer.mark)) {
       winner = cPlayer;
-      return;
     } else if (gameboard.isTie()) {
-      return;
+      winner = false;
     }
 
     _nextPlayerIndex();
   }
 
   function restart() {
-    winner = null;
+    winner = undefined;
     gameboard.clearBoard();
     cPlayerIndex = 0;
     round = 0;
   }
 
-  return { assignPlayer, playRound, restart };
+  return {
+    assignPlayer,
+    playRound,
+    restart,
+    getPlayers,
+    getWinner,
+    maxPlayers,
+  };
 })();
 
-function createPlayer(name, mark) {
-  return { name, mark };
+function createPlayer(name, mark, id) {
+  return { name, mark, id };
 }
 
 const ui = (function () {
-  // const board;
+  // Cache dom
+  const board = document.querySelector(".board");
+  const boardTiles = board.querySelectorAll(".board__tile");
+  const btnRestart = document.querySelector(".btn--restart");
+  const btnStart = document.querySelector(".btn--start");
+  const errorMessage = document.querySelector("#error-message");
+  const playerForm = document.querySelector("#player-form");
+  const playerNameInput = playerForm.querySelector("#player-name");
+  const players = document.querySelector(".players");
 
-  function cacheDOM() {
-    board = board || document.querySelector("#board");
+  // Event listeners
+  board.addEventListener("click", handleBoardClick);
+  playerForm.addEventListener("submit", handleFormSubmit);
+  btnRestart.addEventListener("click", handleRestartClick);
+  btnStart.addEventListener("click", handleStartClick);
+
+  // btnRestart.addEventListener("click", handleRestartClick);
+
+  // Event handlers
+  function handleFormSubmit(e) {
+    e.preventDefault();
+
+    const formData = new FormData(e.target);
+    const playerName = formData.get("player-name");
+
+    game.assignPlayer(playerName);
+    _renderPlayer();
+    _hideMessage();
+
+    playerNameInput.value = "";
+    if (game.getPlayers().length === game.maxPlayers) {
+      _toggleForm();
+    }
   }
 
-  function render() {}
+  function handleBoardClick(e) {
+    if (!e.target.dataset.type === "tile") return;
+
+    if (game.getPlayers().length < game.maxPlayers) {
+      _renderMessage("Player/s missing");
+      return;
+    }
+
+    if (typeof game.getWinner() !== "undefined") {
+      return;
+    }
+
+    _hideMessage();
+
+    const x = parseFloat(e.target.dataset.x);
+    const y = parseFloat(e.target.dataset.y);
+
+    game.playRound(x, y);
+    _renderBoard();
+
+    const winner = game.getWinner();
+    if (winner) {
+      _renderMessage(`${winner.name} has won the game!`, false);
+      _toggleBtn(btnRestart);
+    } else if (winner === false) {
+      _renderMessage("A tie!");
+      _toggleBtn(btnRestart);
+    }
+  }
+
+  function handleRestartClick() {
+    game.restart();
+    _renderBoard();
+    _toggleBtn(btnRestart);
+    _hideMessage();
+  }
+
+  function handleStartClick() {
+    _toggleForm();
+    _toggleBtn(btnStart);
+  }
+
+  // Renders
+  function _renderBoard() {
+    const board = gameboard.getBoard();
+    let cIndex = 0;
+    for (let i = 0; i < board.length; i++) {
+      for (let j = 0; j < board[0].length; j++) {
+        let cMark = "";
+        if (board[i][j]) {
+          cMark = board[i][j];
+        }
+        boardTiles[cIndex].textContent = cMark;
+        cIndex++;
+      }
+    }
+  }
+
+  function _renderPlayer() {
+    const player = game.getPlayers().at(-1);
+    const output = document.createElement("output");
+    output.textContent = `Player ${player.id}: ${player.name} with mark ${player.mark}`;
+    players.appendChild(output);
+  }
+
+  function _renderMessage(message, alert = true) {
+    errorMessage.textContent = message;
+    const state = alert ? "alert" : "success";
+    errorMessage.classList.add(state);
+    errorMessage.classList.remove("hidden");
+  }
+
+  function _hideMessage() {
+    errorMessage.classList.remove("alert", "success");
+    errorMessage.classList.add("hidden");
+  }
+
+  function _toggleForm() {
+    playerForm.classList.toggle("hidden");
+  }
+
+  function _toggleBtn(btn) {
+    btn.classList.toggle("hidden");
+  }
 })();
