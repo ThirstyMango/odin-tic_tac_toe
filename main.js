@@ -1,12 +1,17 @@
 const gameboard = (function () {
-  let board = Array.from(Array(3), () => new Array(3).fill(undefined));
+  // 3x3 board with undefined as a default value
+  const enoughToWin = 3;
+  const boardSize = 3;
+  const board = Array.from(Array(boardSize), () =>
+    new Array(boardSize).fill(undefined)
+  );
 
-  // $ possible directions to win in
+  // Vectors of possible directions a player cam win in
   const boardDirections = {
-    leftDiagonal: { x: 1, y: 1 },
-    rightDiagonal: { x: 1, y: -1 },
-    horizontal: { x: 1, y: 0 },
-    vertical: { x: 0, y: 1 },
+    leftDiagonal: { row: 1, col: 1 },
+    rightDiagonal: { row: 1, col: -1 },
+    vertical: { row: 1, col: 0 },
+    horizontal: { row: 0, col: 1 },
   };
 
   const getBoard = () => board;
@@ -19,34 +24,34 @@ const gameboard = (function () {
   }
 
   function clearBoard() {
-    board = Array.from(Array(3), () => new Array(3).fill(undefined));
+    board.forEach((row) => row.fill(undefined));
   }
 
   // Starting on x, y, determine, whether there are three same marks in the direction
-  function isDirectionWin(x, y, direction, mark, markCount = 0) {
-    if (board[x][y] !== mark) return false;
+  function isDirectionWin(row, col, direction, mark, markCount = 0) {
+    if (board[row][col] !== mark) return false;
     markCount++;
-    if (markCount === 3) return true;
+    if (markCount === enoughToWin) return true;
     return isDirectionWin(
-      x + direction.x,
-      y + direction.y,
+      row + direction.row,
+      col + direction.col,
       direction,
       mark,
       markCount
     );
   }
 
-  function isTie() {
+  function isBoardFull() {
     return !board.some((row) => row.includes(undefined));
   }
 
-  function isWinner(x, y, mark) {
-    const onLeftDiagonal = x === y;
-    const onRightDiagonal = x === 2 - y;
+  function isWinner(row, col, mark) {
+    const onLeftDiagonal = row === col;
+    const onRightDiagonal = row === 2 - col;
 
     let isWinner =
-      isDirectionWin(0, y, boardDirections.horizontal, mark, 0) ||
-      isDirectionWin(x, 0, boardDirections.vertical, mark, 0);
+      isDirectionWin(0, col, boardDirections.vertical, mark, 0) ||
+      isDirectionWin(row, 0, boardDirections.horizontal, mark, 0);
 
     if (onLeftDiagonal)
       isWinner =
@@ -60,12 +65,12 @@ const gameboard = (function () {
     return isWinner;
   }
 
-  return { getBoard, placeMark, isWinner, isTie, clearBoard };
+  return { getBoard, placeMark, isWinner, isBoardFull, clearBoard };
 })();
 
 const game = (function () {
   const maxPlayers = 2;
-  let winner;
+  let winner = undefined;
   let players = [];
   let cPlayerIndex = 0;
   let round = 0;
@@ -85,7 +90,7 @@ const game = (function () {
     cPlayerIndex = (cPlayerIndex + 1) % players.length;
   }
 
-  function playRound(x, y) {
+  function playRound(row, col) {
     if (players.length < 2) {
       throw new Error("Atleast two players must be present");
     }
@@ -94,15 +99,16 @@ const game = (function () {
       throw new Error("Game has already ended");
     }
 
+    if (gameboard.getBoard()[row][col]) {
+      throw new Error("This cell is already full");
+    }
+
     round++;
     const cPlayer = players[cPlayerIndex];
-    gameboard.placeMark(x, y, cPlayer.mark);
+    gameboard.placeMark(row, col, cPlayer.getMark());
 
-    if (gameboard.isWinner(x, y, cPlayer.mark)) {
-      winner = cPlayer;
-    } else if (gameboard.isTie()) {
-      winner = false;
-    }
+    if (gameboard.isWinner(row, col, cPlayer.getMark())) winner = cPlayer;
+    else if (gameboard.isBoardFull()) winner = false;
 
     _nextPlayerIndex();
   }
@@ -126,13 +132,15 @@ const game = (function () {
 })();
 
 function createPlayer(name, mark, id) {
-  return { name, mark, id };
+  const getName = () => name;
+  const getMark = () => mark;
+  const getId = () => id;
+  return { getName, getMark, getId };
 }
 
 const ui = (function () {
   // Cache dom
   const board = document.querySelector(".board");
-  const boardTiles = board.querySelectorAll(".board__tile");
   const btnRestart = document.querySelector(".btn--restart");
   const btnStart = document.querySelector(".btn--start");
   const errorMessage = document.querySelector("#error-message");
@@ -166,6 +174,7 @@ const ui = (function () {
   }
 
   function handleBoardClick(e) {
+    // Edge cases
     if (e.target.dataset.type !== "tile") return;
 
     if (game.getPlayers().length < game.maxPlayers) {
@@ -173,31 +182,28 @@ const ui = (function () {
       return;
     }
 
-    if (typeof game.getWinner() !== "undefined") {
-      return;
-    }
+    if (typeof game.getWinner() !== "undefined") return;
 
+    // Functionality - play one round
     _hideMessage();
 
-    const x = parseFloat(e.target.dataset.x);
-    const y = parseFloat(e.target.dataset.y);
-
-    game.playRound(x, y);
+    const row = parseFloat(e.target.dataset.row);
+    const col = parseFloat(e.target.dataset.col);
+    game.playRound(row, col);
     _renderBoard();
 
     const winner = game.getWinner();
-    if (winner) {
-      _renderMessage(`${winner.name} has won the game!`, false);
-      _toggleBtn(btnRestart);
-    } else if (winner === false) {
-      _renderMessage("A tie!");
-      _toggleBtn(btnRestart);
-    }
+    if (typeof winner === "undefined") return;
+
+    // We have a winner;
+    const message = winner ? `${winner.name} has won the game!` : "A tie!";
+    _renderMessage(message, false);
+    _toggleBtn(btnRestart);
   }
 
   function handleRestartClick() {
     game.restart();
-    _renderBoard();
+    _renderBoard(true);
     _deletePlayers();
     _toggleBtn(btnStart);
     _toggleBtn(btnRestart);
@@ -211,18 +217,24 @@ const ui = (function () {
   }
 
   // DOM creators
-  function createTile(x, y, mark) {
+  function createTile(row, col, mark) {
     const tile = document.createElement("div");
     tile.textContent = mark;
     tile.classList.add("board__tile");
     tile.dataset.type = "tile";
-    tile.dataset.x = `${x}`;
-    tile.dataset.y = `${y}`;
+    tile.dataset.row = `${row}`;
+    tile.dataset.col = `${col}`;
     return tile;
   }
 
   // Renders
-  function _renderBoard() {
+  function _renderBoard(hide = false) {
+    if (hide) {
+      board.classList.add("hidden");
+      return;
+    }
+
+    board.classList.remove("hidden");
     board.textContent = "";
     const boardScheme = gameboard.getBoard();
     // For each board cell, we create a tile from it and append it to the board
@@ -242,9 +254,10 @@ const ui = (function () {
   }
 
   function _renderPlayer() {
+    // Get the latest added player and render it
     const player = game.getPlayers().at(-1);
     const output = document.createElement("output");
-    output.textContent = `Player ${player.id}: ${player.name} with mark ${player.mark}`;
+    output.textContent = `Player ${player.getId()}: ${player.getName()} with mark ${player.getMark()}`;
     players.appendChild(output);
   }
 
