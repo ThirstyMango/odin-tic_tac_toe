@@ -14,7 +14,7 @@ const gameboard = (function () {
     horizontal: { row: 0, col: 1 },
   };
 
-  const getBoard = () => board;
+  const getBoard = () => board.map((row) => [...row]);
 
   function placeMark(x, y, mark) {
     if (board[x][y]) {
@@ -28,17 +28,13 @@ const gameboard = (function () {
   }
 
   // Starting on x, y, determine, whether there are three same marks in the direction
-  function isDirectionWin(row, col, direction, mark, markCount = 0) {
-    if (board[row][col] !== mark) return false;
-    markCount++;
-    if (markCount === enoughToWin) return true;
-    return isDirectionWin(
-      row + direction.row,
-      col + direction.col,
-      direction,
-      mark,
-      markCount
-    );
+  function checkLine(startRow, startCol, direction, mark) {
+    for (let i = 0; i < enoughToWin; i++) {
+      const r = startRow + i * direction.row;
+      const c = startCol + i * direction.col;
+      if (board[r][c] !== mark) return false;
+    }
+    return true;
   }
 
   function isBoardFull() {
@@ -47,20 +43,20 @@ const gameboard = (function () {
 
   function isWinner(row, col, mark) {
     const onLeftDiagonal = row === col;
-    const onRightDiagonal = row === 2 - col;
+    const onRightDiagonal = row === boardSize - 1 - col;
 
     let isWinner =
-      isDirectionWin(0, col, boardDirections.vertical, mark, 0) ||
-      isDirectionWin(row, 0, boardDirections.horizontal, mark, 0);
+      checkLine(0, col, boardDirections.vertical, mark) ||
+      checkLine(row, 0, boardDirections.horizontal, mark);
 
     if (onLeftDiagonal)
       isWinner =
-        isWinner || isDirectionWin(0, 0, boardDirections.leftDiagonal, mark, 0);
+        isWinner || checkLine(0, 0, boardDirections.leftDiagonal, mark);
 
     if (onRightDiagonal)
       isWinner =
         isWinner ||
-        isDirectionWin(0, 2, boardDirections.rightDiagonal, mark, 0);
+        checkLine(0, boardSize - 1, boardDirections.rightDiagonal, mark);
 
     return isWinner;
   }
@@ -70,20 +66,33 @@ const gameboard = (function () {
 
 const game = (function () {
   const maxPlayers = 2;
-  let winner = undefined;
-  let players = [];
+  const players = [];
+  const boardSize = 3;
+  // "setup" | "playing" | "win" | "tie"
+  let status = "setup";
+  let winner = null;
   let cPlayerIndex = 0;
-  let round = 0;
 
-  const getPlayers = () => players;
+  const getPlayers = () => [...players];
 
   const getWinner = () => winner;
 
+  const getStatus = () => status;
+
+  const getBoardSize = () => boardSize;
+
   function assignPlayer(playerName) {
+    if (players.length >= maxPlayers) {
+      throw new Error("Maximum players reached");
+    }
+
     const playerMark = players.length === 0 ? "X" : "O";
     const player = createPlayer(playerName, playerMark, players.length + 1);
-
     players.push(player);
+
+    if (players.length === maxPlayers) {
+      status = "playing";
+    }
   }
 
   function _nextPlayerIndex() {
@@ -92,10 +101,10 @@ const game = (function () {
 
   function playRound(row, col) {
     if (players.length < 2) {
-      throw new Error("Atleast two players must be present");
+      throw new Error("At least two players must be present");
     }
 
-    if (winner) {
+    if (status !== "playing") {
       throw new Error("Game has already ended");
     }
 
@@ -103,19 +112,26 @@ const game = (function () {
       throw new Error("This cell is already full");
     }
 
-    round++;
     const cPlayer = players[cPlayerIndex];
     gameboard.placeMark(row, col, cPlayer.getMark());
 
-    if (gameboard.isWinner(row, col, cPlayer.getMark())) winner = cPlayer;
-    else if (gameboard.isBoardFull()) winner = false;
+    if (gameboard.isWinner(row, col, cPlayer.getMark())) {
+      winner = cPlayer;
+      status = "win";
+    } else if (gameboard.isBoardFull()) {
+      status = "tie";
+    }
 
     _nextPlayerIndex();
+
+    return cPlayer;
   }
 
   function restart() {
-    players = [];
-    winner = undefined;
+    // clear players
+    players.splice(0, players.length);
+    winner = null;
+    status = "setup";
     gameboard.clearBoard();
     cPlayerIndex = 0;
     round = 0;
@@ -127,6 +143,8 @@ const game = (function () {
     restart,
     getPlayers,
     getWinner,
+    getStatus,
+    getBoardSize,
     maxPlayers,
   };
 })();
@@ -164,56 +182,63 @@ const ui = (function () {
     const playerName = formData.get("player-name");
 
     game.assignPlayer(playerName);
-    _renderPlayer();
-    _hideMessage();
+    renderPlayer();
+    hideMessage();
 
     playerNameInput.value = "";
-    if (game.getPlayers().length === game.maxPlayers) {
-      _toggleForm();
+    if (game.getStatus() === "playing") {
+      toggleForm();
     }
   }
 
   function handleBoardClick(e) {
-    // Edge cases
     if (e.target.dataset.type !== "tile") return;
 
-    if (game.getPlayers().length < game.maxPlayers) {
-      _renderMessage("Player/s missing");
-      return;
+    try {
+      const row = parseInt(e.target.dataset.row);
+      const col = parseInt(e.target.dataset.col);
+      const cPlayer = game.playRound(row, col);
+      handleGameState();
+      e.target.textContent = cPlayer.getMark();
+    } catch (error) {
+      renderMessage(error.message);
     }
+  }
 
-    if (typeof game.getWinner() !== "undefined") return;
+  function handleGameState() {
+    const status = game.getStatus();
 
-    // Functionality - play one round
-    _hideMessage();
-
-    const row = parseFloat(e.target.dataset.row);
-    const col = parseFloat(e.target.dataset.col);
-    game.playRound(row, col);
-    _renderBoard();
-
-    const winner = game.getWinner();
-    if (typeof winner === "undefined") return;
-
-    // We have a winner;
-    const message = winner ? `${winner.name} has won the game!` : "A tie!";
-    _renderMessage(message, false);
-    _toggleBtn(btnRestart);
+    switch (status) {
+      case "win":
+        const winner = game.getWinner();
+        renderMessage(
+          `Player ${winner.getName()} with mark ${winner.getMark()} has won.`,
+          false
+        );
+        toggleBtn(btnRestart);
+        break;
+      case "tie":
+        renderMessage("A tie!", false);
+        toggleBtn(btnRestart);
+        break;
+    }
   }
 
   function handleRestartClick() {
     game.restart();
-    _renderBoard(true);
-    _deletePlayers();
-    _toggleBtn(btnStart);
-    _toggleBtn(btnRestart);
-    _hideMessage();
+    renderBoard();
+    deletePlayers();
+    toggleBtn(btnStart);
+    toggleBtn(btnRestart);
+    toggleBoard();
+    hideMessage();
   }
 
   function handleStartClick() {
-    _renderBoard();
-    _toggleForm();
-    _toggleBtn(btnStart);
+    renderBoard();
+    toggleBoard();
+    toggleForm();
+    toggleBtn(btnStart);
   }
 
   // DOM creators
@@ -228,32 +253,17 @@ const ui = (function () {
   }
 
   // Renders
-  function _renderBoard(hide = false) {
-    if (hide) {
-      board.classList.add("hidden");
-      return;
-    }
-
-    board.classList.remove("hidden");
+  function renderBoard() {
     board.textContent = "";
-    const boardScheme = gameboard.getBoard();
-    // For each board cell, we create a tile from it and append it to the board
-    boardScheme.forEach((row, rowIndex) =>
-      row.forEach((col, colIndex) =>
-        board.appendChild(
-          createTile(
-            rowIndex,
-            colIndex,
-            boardScheme[rowIndex][colIndex]
-              ? boardScheme[rowIndex][colIndex]
-              : ""
-          )
-        )
-      )
-    );
+    const boardSize = game.getBoardSize();
+    for (let i = 0; i < boardSize; i++) {
+      for (let j = 0; j < boardSize; j++) {
+        board.appendChild(createTile(i, j));
+      }
+    }
   }
 
-  function _renderPlayer() {
+  function renderPlayer() {
     // Get the latest added player and render it
     const player = game.getPlayers().at(-1);
     const output = document.createElement("output");
@@ -261,27 +271,32 @@ const ui = (function () {
     players.appendChild(output);
   }
 
-  function _renderMessage(message, alert = true) {
+  function renderMessage(message, alert = true) {
+    errorMessage.classList.remove("alert", "success");
     errorMessage.textContent = message;
     const state = alert ? "alert" : "success";
     errorMessage.classList.add(state);
     errorMessage.classList.remove("hidden");
   }
 
-  function _deletePlayers() {
+  function deletePlayers() {
     players.textContent = "";
   }
 
-  function _hideMessage() {
+  function hideMessage() {
     errorMessage.classList.remove("alert", "success");
     errorMessage.classList.add("hidden");
   }
 
-  function _toggleForm() {
+  function toggleBoard() {
+    board.classList.toggle("hidden");
+  }
+
+  function toggleForm() {
     playerForm.classList.toggle("hidden");
   }
 
-  function _toggleBtn(btn) {
+  function toggleBtn(btn) {
     btn.classList.toggle("hidden");
   }
 })();
